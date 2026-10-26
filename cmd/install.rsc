@@ -1,8 +1,16 @@
-# MikrotikVPN installer for RouterOS 7.21+ / ARMv7.
+# MikrotikVPN installer for RouterOS 7.21+ / ARMv7 or ARM64.
 # Download this file with the one-line command from README. Do not import it manually.
 
 :local repo "https://github.com/oproskyrin/MikrotikVPN/releases/latest/download"
+:local architecture [/system resource get architecture-name]
+:local assetArch ""
+:if ($architecture = "arm") do={ :set assetArch "armv7" }
+:if ($architecture = "arm64") do={ :set assetArch "arm64" }
+:if ($assetArch = "") do={ :error ("Unsupported architecture: " . $architecture . ". Supported: arm, arm64.") }
 :local lanBridge "bridge"
+:if ([:len [/interface bridge find where name=$lanBridge]] = 0) do={
+  :if ([:len [/interface bridge find where name="bridgeLocal"]] > 0) do={ :set lanBridge "bridgeLocal" }
+}
 :local webPort 8080
 :local net "172.31.255"
 :local apiUser "unblock-api"
@@ -19,9 +27,9 @@
   :error "At least 25 MB of free storage is required."
 }
 
-:put "[MikrotikVPN] Downloading ARMv7 images from GitHub Releases..."
-/tool fetch url=($repo . "/xray-vless-armv7.tar.gz") dst-path="xray-vless-armv7.tar.gz" mode=https check-certificate=yes
-/tool fetch url=($repo . "/unblock-panel-armv7.tar.gz") dst-path="unblock-panel-armv7.tar.gz" mode=https check-certificate=yes
+:put ("[MikrotikVPN] Downloading " . $assetArch . " images from GitHub Releases...")
+/tool fetch url=($repo . ("/xray-vless-" . $assetArch . ".tar.gz")) dst-path=("xray-vless-" . $assetArch . ".tar.gz") mode=https check-certificate=yes
+/tool fetch url=($repo . ("/unblock-panel-" . $assetArch . ".tar.gz")) dst-path=("unblock-panel-" . $assetArch . ".tar.gz") mode=https check-certificate=yes
 
 /interface bridge add name=bridge-unblock comment="MikrotikVPN container network"
 /interface veth add name=xray-veth address=($net . ".2/24") gateway=($net . ".1")
@@ -50,13 +58,13 @@
 /container envs add list=PANEL_ENV key=LAN_ADDR value=[/ip address get [find where interface=$lanBridge] address]
 /container envs add list=PANEL_ENV key=PANEL_PASSWORD value=$panelPass
 
-/container add file=xray-vless-armv7.tar.gz name=xray-vless interface=xray-veth mounts=XRAY_MOUNT start-on-boot=yes logging=yes
-/container add file=unblock-panel-armv7.tar.gz name=unblock-panel interface=panel-veth mounts=PANEL_RW,PANEL_DATA envlist=PANEL_ENV start-on-boot=yes logging=yes
+/container add file=("xray-vless-" . $assetArch . ".tar.gz") name=xray-vless interface=xray-veth mounts=XRAY_MOUNT start-on-boot=yes logging=yes
+/container add file=("unblock-panel-" . $assetArch . ".tar.gz") name=unblock-panel interface=panel-veth mounts=PANEL_RW,PANEL_DATA envlist=PANEL_ENV start-on-boot=yes logging=yes
 /ip firewall nat add chain=dstnat protocol=tcp in-interface=$lanBridge dst-port=$webPort action=dst-nat to-addresses=($net . ".3") to-ports=8080 comment="MikrotikVPN panel"
 
 :delay 5s
-/file remove xray-vless-armv7.tar.gz
-/file remove unblock-panel-armv7.tar.gz
+/file remove ("xray-vless-" . $assetArch . ".tar.gz")
+/file remove ("unblock-panel-" . $assetArch . ".tar.gz")
 :put ""
 :put "MikrotikVPN installed."
 :put ("Open: http://" . [:pick [/ip address get [find where interface=$lanBridge] address] 0 [:find [/ip address get [find where interface=$lanBridge] address] "/"]] . ":" . $webPort)
