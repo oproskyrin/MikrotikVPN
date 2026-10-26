@@ -48,7 +48,6 @@
 
 /user group add name=unblock-api policy=api,read,write comment="MikrotikVPN"
 /user add name=$apiUser group=unblock-api password=$apiPass comment="MikrotikVPN"
-/ip service set api disabled=no address=($net . ".0/24")
 
 /container envs add list=PANEL_ENV key=ROUTER_USER value=$apiUser
 /container envs add list=PANEL_ENV key=ROUTER_PASS value=$apiPass
@@ -58,8 +57,9 @@
 /container envs add list=PANEL_ENV key=LAN_ADDR value=[/ip address get [find where interface=$lanBridge] address]
 /container envs add list=PANEL_ENV key=PANEL_PASSWORD value=$panelPass
 
-/container add file=("xray-vless-" . $assetArch . ".tar.gz") name=xray-vless interface=xray-veth mounts=XRAY_MOUNT start-on-boot=yes logging=yes
-/container add file=("unblock-panel-" . $assetArch . ".tar.gz") name=unblock-panel interface=panel-veth mounts=PANEL_RW,PANEL_DATA envlist=PANEL_ENV start-on-boot=yes logging=yes
+/container add file=("xray-vless-" . $assetArch . ".tar.gz") name=xray-vless interface=xray-veth mountlists=XRAY_MOUNT start-on-boot=yes logging=yes
+/container add file=("unblock-panel-" . $assetArch . ".tar.gz") name=unblock-panel interface=panel-veth mountlists=PANEL_RW,PANEL_DATA envlist=PANEL_ENV start-on-boot=yes logging=yes
+/ip service set api disabled=no address=($net . ".0/24")
 /ip firewall nat add chain=dstnat protocol=tcp in-interface=$lanBridge dst-port=$webPort action=dst-nat to-addresses=($net . ".3") to-ports=8080 comment="MikrotikVPN panel"
 
 :delay 5s
