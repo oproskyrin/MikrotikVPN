@@ -1,0 +1,46 @@
+name: Build release images
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.3'
+      - name: Build ARMv7 panel
+        working-directory: src
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags='-s -w' -o ../dist/panel .
+      - name: Build container archives
+        run: |
+          set -eux
+          mkdir -p dist/panel-layer dist/xray-layer/usr/local/bin dist/xray-layer/etc/ssl/certs stage/panel stage/xray
+          install -m 755 dist/panel dist/panel-layer/panel
+          cp /etc/ssl/certs/ca-certificates.crt dist/xray-layer/etc/ssl/certs/
+          curl -fsSL -o /tmp/xray.zip https://github.com/XTLS/Xray-core/releases/download/v26.10.21/Xray-linux-arm32-v7a.zip
+          unzip -q /tmp/xray.zip xray -d /tmp/xray
+          install -m 755 /tmp/xray/xray dist/xray-layer/usr/local/bin/xray
+          tar -C dist/panel-layer -cf stage/panel/layer.tar panel
+          tar -C dist/xray-layer -cf stage/xray/layer.tar .
+          printf '%s' '{"architecture":"arm","os":"linux","config":{"Entrypoint":["/panel"],"WorkingDir":"/"}}' > stage/panel/config.json
+          printf '%s' '[{"Config":"config.json","RepoTags":["local/unblock-panel:armv7"],"Layers":["layer.tar"]}]' > stage/panel/manifest.json
+          printf '%s' '{"local":{"unblock-panel":{"armv7":"layer"}}}' > stage/panel/repositories
+          tar -C stage/panel -czf dist/unblock-panel-armv7.tar.gz config.json manifest.json repositories layer.tar
+          printf '%s' '{"architecture":"arm","os":"linux","config":{"Entrypoint":["/usr/local/bin/xray","run","-config","/etc/xray/config.json"],"WorkingDir":"/"}}' > stage/xray/config.json
+          printf '%s' '[{"Config":"config.json","RepoTags":["local/xray-vless:armv7"],"Layers":["layer.tar"]}]' > stage/xray/manifest.json
+          printf '%s' '{"local":{"xray-vless":{"armv7":"layer"}}}' > stage/xray/repositories
+          tar -C stage/xray -czf dist/xray-vless-armv7.tar.gz config.json manifest.json repositories layer.tar
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/unblock-panel-armv7.tar.gz
+            dist/xray-vless-armv7.tar.gz
