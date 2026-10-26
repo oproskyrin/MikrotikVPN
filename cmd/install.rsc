@@ -38,8 +38,8 @@
 /interface bridge port add bridge=bridge-unblock interface=panel-veth
 /ip address add address=($net . ".1/24") interface=bridge-unblock comment="MikrotikVPN gateway"
 
-/file make-directory name=xray-config
-/file make-directory name=panel-data
+/file add name=xray-config type=directory
+/file add name=panel-data type=directory
 /file add name=xray-config/config.json contents="{\"log\":{\"loglevel\":\"warning\"},\"inbounds\":[{\"listen\":\"0.0.0.0\",\"port\":1080,\"protocol\":\"socks\",\"settings\":{\"udp\":true}}],\"outbounds\":[{\"tag\":\"direct\",\"protocol\":\"freedom\"}],\"routing\":{\"rules\":[]}}"
 
 /container mounts add list=XRAY_MOUNT src=/xray-config dst=/etc/xray mode=ro
