@@ -442,13 +442,13 @@ func (a *App) xrayStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer c.Close()
-	rows, e := c.cmd("/container/print", map[string]string{".proplist": "name,status,memory-current,cpu-usage"}, "?name=xray-vless")
+	rows, e := c.cmd("/container/print", map[string]string{".proplist": "name,running,memory-current,cpu-usage"}, "?name=xray-vless")
 	if e != nil || len(rows) == 0 {
 		jsonOut(w, map[string]any{"running": false})
 		return
 	}
 	row := rows[0]
-	jsonOut(w, map[string]any{"running": row["status"] == "running", "memory": row["memory-current"], "cpu": row["cpu-usage"]})
+	jsonOut(w, map[string]any{"running": row["running"] == "true", "memory": row["memory-current"], "cpu": row["cpu-usage"]})
 }
 func (a *App) test(w http.ResponseWriter, r *http.Request) {
 	if a.xraySocks == "" {
